@@ -139,8 +139,9 @@ export const compressAndSplitVideo = async (
     }
 
     // PURE STATUS ALGORITHM: max 1280p scaling, libx264, -crf 22, strict bitrate limits, segment 30s
-    // Added -r 30, -pix_fmt yuv420p, -profile:v main, -movflags +faststart to strictly bypass WhatsApp's fps/HDR recompression triggers
-    const ffmpegCommand = `${inputs} -filter_complex "${filterComplex}" ${maps} -c:v libx264 -crf 22 -maxrate 3.0M -bufsize 6.0M -preset ultrafast -r 30 -pix_fmt yuv420p -profile:v main -c:a aac -b:a 128k -ar 44100 -movflags +faststart -f segment -segment_time 30 -reset_timestamps 1 "${outputPattern}"`;
+    // Added -r 30, -pix_fmt yuv420p, -profile:v main to strictly bypass WhatsApp's fps/HDR recompression triggers
+    // NOTE: Removed -movflags +faststart because it corrupts the -f segment output, resulting in black unplayable videos!
+    const ffmpegCommand = `${inputs} -filter_complex "${filterComplex}" ${maps} -c:v libx264 -crf 22 -maxrate 3.0M -bufsize 6.0M -preset ultrafast -r 30 -pix_fmt yuv420p -profile:v main -c:a aac -b:a 128k -ar 44100 -f segment -segment_time 30 -reset_timestamps 1 "${outputPattern}"`;
 
     console.log('[ReginaStatus] FFmpeg command:', ffmpegCommand);
 

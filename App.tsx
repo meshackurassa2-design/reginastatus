@@ -12,7 +12,6 @@ import EditorScreen from './components/EditorScreen';
 import PhotoCompressScreen from './components/PhotoCompressScreen';
 import { Ionicons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
-import * as ImageManipulator from 'expo-image-manipulator';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -345,6 +344,8 @@ function App() {
               setIsProcessing(true);
               setProcessedUris([]);
               try {
+                // Dynamically import to prevent native module crashes on startup
+                const ImageManipulator = await import('expo-image-manipulator');
                 const compressed: string[] = [];
                 let idx = 0;
                 for (const uri of selectedMedia.uris) {
