@@ -5,7 +5,7 @@
  * Watermark is applied as a UI overlay (burned-in watermark requires a
  * future server-side step or a stable native build).
  */
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import { Audio, Video } from 'expo-av';
 
 export interface VideoProcessingOptions {
