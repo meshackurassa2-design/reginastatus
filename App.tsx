@@ -248,41 +248,56 @@ function App() {
   };
 
   const handleShare = async (uris: string[]) => {
+    if (uris.length === 0) {
+      alert('No files to share.');
+      return;
+    }
     try {
-      if (!(await Sharing.isAvailableAsync()) || uris.length === 0) {
-        alert('Sharing is not available on this device');
+      const available = await Sharing.isAvailableAsync();
+      if (!available) {
+        alert('Sharing is not available on this device.');
         return;
       }
-      
+
+      // Resolve ph:// or assets-library:// to local cache file
       let shareUri = uris[0];
-      if (shareUri.startsWith('ph://')) {
-        const localUri = (FileSystem as any).cacheDirectory + 'share_media.mp4';
+      if (shareUri.startsWith('ph://') || shareUri.startsWith('assets-library://')) {
+        const ext = shareUri.includes('.jpg') || shareUri.includes('.jpeg') ? 'jpg' : 'mp4';
+        const localUri = ((FileSystem as any).cacheDirectory as string) + `share_media.${ext}`;
+        // Remove existing cached file first
+        const existing = await FileSystem.getInfoAsync(localUri);
+        if (existing.exists) await FileSystem.deleteAsync(localUri, { idempotent: true });
         await FileSystem.copyAsync({ from: shareUri, to: localUri });
         shareUri = localUri;
       }
 
-      await Sharing.shareAsync(shareUri, {
-        dialogTitle: 'Share to WhatsApp'
-      });
-    } catch (e) {
-      console.warn(e);
+      await Sharing.shareAsync(shareUri, { dialogTitle: 'Share via WhatsApp' });
+    } catch (e: any) {
+      alert('Share failed: ' + (e?.message ?? String(e)));
     }
   };
 
   const handleSaveToGallery = async (uris: string[]) => {
     try {
       const { status } = await MediaLibrary.requestPermissionsAsync();
-      if (status === 'granted') {
-        for (const uri of uris) {
-          await MediaLibrary.saveToLibraryAsync(uri);
-        }
-        alert(`Successfully saved ${uris.length} file${uris.length > 1 ? 's' : ''} to your Camera Roll!`);
-      } else {
-        alert('Permission needed to save video to gallery.');
+      if (status !== 'granted') {
+        alert('Camera Roll permission is required to save files. Please allow it in Settings.');
+        return;
       }
-    } catch (e) {
-      console.warn(e);
-      alert('Failed to save to gallery.');
+
+      let saved = 0;
+      for (const uri of uris) {
+        // ph:// assets are ALREADY in the library — skip them
+        if (uri.startsWith('ph://') || uri.startsWith('assets-library://')) {
+          saved++;
+          continue;
+        }
+        await MediaLibrary.saveToLibraryAsync(uri);
+        saved++;
+      }
+      alert(`✅ Saved ${saved} file${saved > 1 ? 's' : ''} to your Camera Roll!`);
+    } catch (e: any) {
+      alert('Save failed: ' + (e?.message ?? String(e)));
     }
   };
 

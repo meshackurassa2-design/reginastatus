@@ -19,8 +19,7 @@
     "expo-tracking-transparency": "^57.0.1",
     "expo-video-thumbnails": "~10.0.8",
     "react": "19.1.0",
-    "react-native": "0.81.5",
-    "@nikhil-cephei/ffmpeg-kit-react-native": "^6.0.12"
+    "react-native": "0.81.5"
   },
   "@nikhil-cephei/ffmpeg-kit-react-native": {
     "ios": {
