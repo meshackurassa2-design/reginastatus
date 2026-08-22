@@ -229,17 +229,21 @@ function App() {
     setIsProcessing(true);
     setProcessedUris([]);
     
-    // Lazy-safe: ffmpeg is loaded via require() inside VideoProcessor
-    const result = await compressAndSplitVideo(selectedMedia.uris[0], options.trimEndMillis, options);
-    
-    try { LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut); } catch (_) {}
-    
-    setIsProcessing(false);
-    
-    if (result.success) {
-      setProcessedUris(result.outputUris);
-    } else {
-      alert('Failed to process video: ' + result.error);
+    try {
+      const result = await compressAndSplitVideo(selectedMedia.uris[0], options.trimEndMillis, options);
+      
+      try { LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut); } catch (_) {}
+      
+      setIsProcessing(false);
+      
+      if (result.success) {
+        setProcessedUris(result.outputUris);
+      } else {
+        alert('Processing failed:\n' + result.error);
+      }
+    } catch (err: any) {
+      setIsProcessing(false);
+      alert('Crash caught:\n' + (err?.message ?? String(err)));
     }
   };
 
