@@ -45,7 +45,10 @@ export const compressAndSplitVideo = async (
   options: VideoProcessingOptions = {}
 ): Promise<ProcessResult> => {
   try {
-    const { FFmpegKit, ReturnCode } = require('ffmpeg-kit-extended');
+    const { FFmpegKitExtended, FFmpegKit, isSuccessReturnCode } = require('ffmpeg-kit-extended');
+    
+    // The new TurboModule requires initialization before use
+    FFmpegKitExtended.initialize();
 
     const {
       trimStartMillis = 0,
@@ -120,10 +123,10 @@ export const compressAndSplitVideo = async (
 
     console.log('[ReginaStatus] FFmpeg command:', ffmpegCommand);
 
-    const session = await FFmpegKit.execute(ffmpegCommand);
+    const session = await FFmpegKit.executeAsync(ffmpegCommand);
     const returnCode = await session.getReturnCode();
 
-    if (ReturnCode.isSuccess(returnCode)) {
+    if (isSuccessReturnCode(returnCode)) {
       const files = await FileSystem.readDirectoryAsync(outputDir);
       const generatedFiles = files
         .filter(f => f.startsWith(`output_${timestamp}_`))
