@@ -51,6 +51,9 @@
         {
           "photosPermission": "Allow ReginaStatus to access your photo library."
         }
+      ],
+      [
+        "@spreen/ffmpeg-kit-react-native-config"
       ]
     ]
   }
