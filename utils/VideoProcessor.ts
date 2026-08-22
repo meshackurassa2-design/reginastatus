@@ -1,8 +1,3 @@
-/**
- * VideoProcessor — Pure Expo + React Native Compressor implementation
- *
- * Uses react-native-compressor to heavily compress the video for WhatsApp.
- */
 import * as FileSystem from 'expo-file-system/legacy';
 
 export interface VideoProcessingOptions {
@@ -23,7 +18,7 @@ export interface ProcessResult {
 /**
  * Resolves any URI (ph://, assets-library://, file://) to a local cache path.
  * We ALWAYS copy the file to the app's cache directory first to guarantee
- * that react-native-compressor has sandbox read permissions, preventing "Setup failure".
+ * that FFmpeg has sandbox read permissions, preventing native crash.
  */
 const resolveUri = async (uri: string, name: string): Promise<string> => {
   if (!uri) throw new Error('Empty URI provided');
@@ -35,65 +30,125 @@ const resolveUri = async (uri: string, name: string): Promise<string> => {
   const existing = await FileSystem.getInfoAsync(dest);
   if (existing.exists) await FileSystem.deleteAsync(dest, { idempotent: true });
   
-  if (uri.startsWith('ph://') || uri.startsWith('assets-library://')) {
-    await FileSystem.copyAsync({ from: uri, to: dest });
-  } else if (uri.startsWith('file://')) {
-    await FileSystem.copyAsync({ from: uri, to: dest });
-  } else {
-    // If it's something else, try copying anyway
-    await FileSystem.copyAsync({ from: uri, to: dest });
-  }
+  await FileSystem.copyAsync({ from: uri, to: dest });
 
   return dest;
 };
 
 /**
- * Main processing function.
- *
- * Compresses the video using react-native-compressor so it fits perfectly on WhatsApp.
+ * Main video processing function.
+ * Trims, watermarks, adjusts audio, and splits video into 30s chunks.
  */
 export const compressAndSplitVideo = async (
   inputUri: string,
-  _durationMillis: number,
+  durationMillis: number,
   options: VideoProcessingOptions = {}
 ): Promise<ProcessResult> => {
   try {
-    // Step 1: resolve to a local file URI
-    const localUri = await resolveUri(inputUri, 'rs_source_video');
+    const { FFmpegKit, ReturnCode } = require('ffmpeg-kit-react-native');
 
-    // Step 2: Compress the video heavily for WhatsApp Status
-    const { Video: RNCompressor } = require('react-native-compressor');
-    const compressedUri = await RNCompressor.compress(
-      localUri,
-      {
-        compressionMethod: 'auto',
-        minimumFileSizeForCompress: 0,
-      },
-      (progress) => {
-        console.log('[ReginaStatus] Video Compression Progress: ', progress);
+    const {
+      trimStartMillis = 0,
+      trimEndMillis = durationMillis,
+      watermarkText = 'ReginaStatus',
+      musicUri = null,
+      videoVolume = 1.0,
+      musicVolume = 1.0,
+    } = options;
+
+    // Resolve input URI to a real file path
+    const safeInput = await resolveUri(inputUri, 'rs_input_video');
+    const inputForFfmpeg = safeInput.replace('file://', '');
+
+    // Set up output directory
+    const outputDir = ((FileSystem as any).cacheDirectory as string) + 'reginastatus_exports/';
+    const dirInfo = await FileSystem.getInfoAsync(outputDir);
+    if (!dirInfo.exists) {
+      await FileSystem.makeDirectoryAsync(outputDir, { intermediates: true });
+    }
+
+    const timestamp = Date.now();
+    const outputPattern = `${outputDir.replace('file://', '')}output_${timestamp}_%03d.mp4`;
+
+    const startSec = trimStartMillis / 1000;
+    const endSec = trimEndMillis / 1000;
+    const durationSec = Math.max(endSec - startSec, 1);
+
+    // Build inputs
+    let inputs = `-ss ${startSec} -t ${durationSec} -i "${inputForFfmpeg}"`;
+
+    let musicForFfmpeg: string | null = null;
+    if (musicUri) {
+      try {
+        const safeMusic = await resolveUri(musicUri, 'rs_input_music');
+        musicForFfmpeg = safeMusic.replace('file://', '');
+        inputs += ` -i "${musicForFfmpeg}"`;
+      } catch (_) {
+        musicForFfmpeg = null;
       }
-    );
+    }
 
-    // Verify the output exists
-    const info = await FileSystem.getInfoAsync(compressedUri);
-    if (!info.exists) {
+    // Build filter_complex
+    let filterComplex = '';
+    const sanitizedWatermark = watermarkText
+      .replace(/\\/g, '\\\\')
+      .replace(/:/g, '\\:')
+      .replace(/'/g, "\\'")
+      .replace(/\[/g, '\\[')
+      .replace(/\]/g, '\\]');
+
+    const videoFilter = `scale=-2:720,drawtext=text='${sanitizedWatermark}':fontcolor=white:fontsize=28:x=w-tw-16:y=h-th-16:shadowcolor=black:shadowx=2:shadowy=2`;
+
+    if (musicForFfmpeg) {
+      filterComplex = `[0:v]${videoFilter}[vout];[0:a]volume=${videoVolume}[a1];[1:a]volume=${musicVolume}[a2];[a1][a2]amix=inputs=2:duration=first:dropout_transition=2[aout]`;
+    } else if (videoVolume !== 1.0) {
+      filterComplex = `[0:v]${videoFilter}[vout];[0:a]volume=${videoVolume}[aout]`;
+    } else {
+      filterComplex = `[0:v]${videoFilter}[vout]`;
+    }
+
+    // Map outputs
+    let maps = `-map "[vout]"`;
+    if (musicForFfmpeg || videoVolume !== 1.0) {
+      maps += ` -map "[aout]"`;
+    } else {
+      maps += ` -map 0:a?`;
+    }
+
+    const ffmpegCommand = `${inputs} -filter_complex "${filterComplex}" ${maps} -c:v libx264 -crf 23 -preset ultrafast -c:a aac -b:a 128k -f segment -segment_time 30 -reset_timestamps 1 "${outputPattern}"`;
+
+    console.log('[ReginaStatus] FFmpeg command:', ffmpegCommand);
+
+    const session = await FFmpegKit.execute(ffmpegCommand);
+    const returnCode = await session.getReturnCode();
+
+    if (ReturnCode.isSuccess(returnCode)) {
+      const files = await FileSystem.readDirectoryAsync(outputDir);
+      const generatedFiles = files
+        .filter(f => f.startsWith(`output_${timestamp}_`))
+        .sort()
+        .map(f => `file://${outputDir}${f}`);
+
+      if (generatedFiles.length === 0) {
+        return { success: false, outputUris: [], error: 'FFmpeg ran but produced no output files.' };
+      }
+
+      return { success: true, outputUris: generatedFiles };
+    } else {
+      const logs = await session.getLogsAsString();
+      console.error('[ReginaStatus] FFmpeg failed:', logs);
       return {
         success: false,
         outputUris: [],
-        error: 'Output file is empty or missing after compression.',
+        error: 'Video processing failed with FFmpeg error. ' + (logs?.substring(0, 100) ?? ''),
       };
     }
-
-    return {
-      success: true,
-      outputUris: [compressedUri],
-    };
   } catch (err: any) {
-    console.error('[VideoProcessor] Error:', err);
+    console.error('[ReginaStatus] VideoProcessor error:', err);
     return {
       success: false,
       outputUris: [],
-      error: err?.message ?? 'Unknown error during video compression.',
+      error: err?.message ?? 'Unknown video processing error.',
     };
   }
 };

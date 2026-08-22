@@ -319,7 +319,7 @@ function App() {
   }
 
   // 2 & 3. Main App Flow (Gallery -> Editor/Compress -> Success)
-  if (processedUris.length === 0) {
+  if (processedUris.length === 0 && !isProcessing) {
     return (
       <>
         <StatusBar style="light" />
