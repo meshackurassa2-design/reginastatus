@@ -5,7 +5,7 @@ import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as MediaLibrary from 'expo-media-library';
-import { compressAndSplitVideo } from './utils/VideoProcessor';
+// VideoProcessor is loaded lazily to prevent native module crash at startup
 import OnboardingScreen from './components/OnboardingScreen';
 import GalleryScreen from './components/GalleryScreen';
 import EditorScreen from './components/EditorScreen';
@@ -190,20 +190,22 @@ function App() {
       ]).start();
 
       setTimeout(() => {
-        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+        try { LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut); } catch (_) {}
         setIsSplashVisible(false);
       }, 2000);
     };
 
     checkOnboarding();
     
-    Audio.setAudioModeAsync({
-      playsInSilentModeIOS: true,
-      allowsRecordingIOS: false,
-      staysActiveInBackground: false,
-      shouldDuckAndroid: true,
-      playThroughEarpieceAndroid: false,
-    });
+    try {
+      Audio.setAudioModeAsync({
+        playsInSilentModeIOS: true,
+        allowsRecordingIOS: false,
+        staysActiveInBackground: false,
+        shouldDuckAndroid: true,
+        playThroughEarpieceAndroid: false,
+      });
+    } catch (_) {}
   }, []);
 
   const handleOnboardingComplete = async () => {
@@ -227,10 +229,11 @@ function App() {
     setIsProcessing(true);
     setProcessedUris([]);
     
-    // The duration in compressAndSplitVideo originally was the total duration, we can pass trimEndMillis for it
+    // Lazy import to prevent native module crash at startup
+    const { compressAndSplitVideo } = await import('./utils/VideoProcessor');
     const result = await compressAndSplitVideo(selectedMedia.uris[0], options.trimEndMillis, options);
     
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    try { LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut); } catch (_) {}
     
     setIsProcessing(false);
     
