@@ -45,7 +45,7 @@ export const compressAndSplitVideo = async (
   options: VideoProcessingOptions = {}
 ): Promise<ProcessResult> => {
   try {
-    const { FFmpegKit, ReturnCode } = require('@spreen/ffmpeg-kit-react-native');
+    const { FFmpegKit, ReturnCode } = require('@nikhil-cephei/ffmpeg-kit-react-native');
 
     const {
       trimStartMillis = 0,
