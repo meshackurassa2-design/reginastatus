@@ -122,19 +122,19 @@ export default function GalleryScreen({ onSelectMedia }: GalleryScreenProps) {
   );
 
   const renderItem = ({ item }: { item: MediaLibrary.Asset }) => {
-    const isSelected = selectedPhotos.includes(item.id);
+    const isSelected = selectedPhotos.includes(item.uri);
     return (
       <TouchableOpacity 
         style={styles.gridItem} 
         onPress={async () => {
           if (mediaType === 'photo') {
             setSelectedPhotos(prev => {
-              if (prev.includes(item.id)) return prev.filter(id => id !== item.id);
+              if (prev.includes(item.uri)) return prev.filter(uri => uri !== item.uri);
               if (prev.length >= 10) {
                 Toast.show('You can only select up to 10 photos at a time.');
                 return prev;
               }
-              return [...prev, item.id];
+              return [...prev, item.uri];
             });
             return;
           }
@@ -228,20 +228,7 @@ export default function GalleryScreen({ onSelectMedia }: GalleryScreenProps) {
         <View style={styles.nextButtonContainer}>
           <TouchableOpacity 
             style={styles.nextButton} 
-            onPress={async () => {
-              setLoading(true);
-              const resolvedUris: string[] = [];
-              for (const id of selectedPhotos) {
-                try {
-                  const info = await MediaLibrary.getAssetInfoAsync(id);
-                  resolvedUris.push(info.localUri || info.uri);
-                } catch (e) {
-                  resolvedUris.push(id); // fallback
-                }
-              }
-              setLoading(false);
-              onSelectMedia(resolvedUris, 'photo');
-            }}
+            onPress={() => onSelectMedia(selectedPhotos, 'photo')}
             activeOpacity={0.8}
           >
             <Text style={styles.nextButtonText}>Next ({selectedPhotos.length})</Text>

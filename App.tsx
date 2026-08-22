@@ -85,6 +85,8 @@ const SuccessAnimation = ({ uris, shareClip, saveClip }: { uris: string[], share
   const contentTranslateY = useRef(new Animated.Value(20)).current;
   const buttonsOpacity = useRef(new Animated.Value(0)).current;
   const buttonsTranslateY = useRef(new Animated.Value(20)).current;
+  
+  const [isSaved, setIsSaved] = useState(false);
 
   useEffect(() => {
     Animated.sequence([
@@ -152,20 +154,27 @@ const SuccessAnimation = ({ uris, shareClip, saveClip }: { uris: string[], share
             <Ionicons name="chevron-forward" size={20} color="rgba(0,0,0,0.3)" />
           </TouchableOpacity>
 
-          <TouchableOpacity style={[styles.premiumShareButton, { backgroundColor: 'rgba(255,255,255,0.05)' }]} onPress={() => saveClip(uris)}>
-            <View style={[styles.whatsappIconContainer, { backgroundColor: 'rgba(255,255,255,0.1)' }]}>
-              <Ionicons name="download-outline" size={24} color="#FFF" />
+          <TouchableOpacity 
+            style={[styles.premiumShareButton, { backgroundColor: isSaved ? 'rgba(37, 211, 102, 0.15)' : 'rgba(255,255,255,0.05)' }]} 
+            onPress={() => {
+              saveClip(uris);
+              setIsSaved(true);
+            }}
+            disabled={isSaved}
+          >
+            <View style={[styles.whatsappIconContainer, { backgroundColor: isSaved ? 'rgba(37, 211, 102, 0.25)' : 'rgba(255,255,255,0.1)' }]}>
+              <Ionicons name={isSaved ? "checkmark-done" : "download-outline"} size={24} color={isSaved ? "#25D366" : "#FFF"} />
             </View>
-            <Text style={[styles.premiumShareText, { color: '#FFF' }]}>
-              Save to Gallery
+            <Text style={[styles.premiumShareText, { color: isSaved ? '#25D366' : '#FFF' }]}>
+              {isSaved ? "Saved to Camera Roll" : "Save to Gallery"}
             </Text>
-            <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.3)" />
           </TouchableOpacity>
         </View>
       </Animated.View>
     </View>
   );
 };
+
 
 function App() {
   const [isSplashVisible, setIsSplashVisible] = useState(true);
@@ -346,14 +355,7 @@ function App() {
                 const compressed: string[] = [];
                 let idx = 0;
                 for (const uri of selectedMedia.uris) {
-                  // Resolve ph:// to file:// by copying to cache
-                  let localUri = uri;
-                  if (uri.startsWith('ph://') || uri.startsWith('assets-library://')) {
-                    localUri = ((FileSystem as any).cacheDirectory as string) + `temp_img_${idx}.jpg`;
-                    const existing = await FileSystem.getInfoAsync(localUri);
-                    if (existing.exists) await FileSystem.deleteAsync(localUri, { idempotent: true });
-                    await FileSystem.copyAsync({ from: uri, to: localUri });
-                  }
+                  const localUri = uri;
                   
                   const result = await ImageManipulator.manipulateAsync(
                     localUri,
