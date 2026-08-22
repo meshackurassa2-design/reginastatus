@@ -291,12 +291,10 @@ function App() {
         return;
       }
       
-      let saved = 0;
       for (const uri of uris) {
         await MediaLibrary.saveToLibraryAsync(uri);
-        saved++;
       }
-      Toast.show(`Saved ${saved} file${saved > 1 ? 's' : ''} to your Camera Roll.`);
+      // No toast here anymore, the button itself changes state!
     } catch (e: any) {
       Toast.show('Save failed: ' + (e?.message ?? String(e)));
     }

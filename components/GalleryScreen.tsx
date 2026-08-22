@@ -206,7 +206,23 @@ export default function GalleryScreen({ onSelectMedia }: GalleryScreenProps) {
           
           <TouchableOpacity 
             style={[styles.tabItem, mediaType === 'photo' && styles.tabItemActivePhoto]} 
-            onPress={() => { setMediaType('photo'); setSelectedPhotos([]); }}
+            onPress={async () => { 
+              try {
+                const ImagePicker = await import('expo-image-picker');
+                const result = await ImagePicker.launchImageLibraryAsync({
+                  mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                  allowsMultipleSelection: true,
+                  selectionLimit: 10,
+                  quality: 1,
+                });
+                if (!result.canceled && result.assets.length > 0) {
+                  onSelectMedia(result.assets.map(a => a.uri), 'photo');
+                }
+              } catch (e) {
+                console.warn(e);
+                Toast.show("Failed to open photo picker.");
+              }
+            }}
           >
             <Ionicons name="image" size={20} color={mediaType === 'photo' ? '#FFF' : '#888'} />
             <Text style={[styles.tabText, mediaType === 'photo' ? styles.tabTextActivePhotoText : null]}>Photos</Text>
