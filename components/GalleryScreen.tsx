@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, FlatList, Dimensions, ActivityIndicator, Modal, ScrollView, LayoutAnimation, UIManager, Platform, Animated, TextInput } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
+import { Toast } from '../utils/Toast';
 import * as MediaLibrary from 'expo-media-library';
 import { BlurView } from 'expo-blur';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -89,7 +90,7 @@ export default function GalleryScreen({ onSelectMedia }: GalleryScreenProps) {
   const handleContactAdmin = () => {
     import('react-native').then(({ Linking }) => {
       Linking.openURL('whatsapp://send?phone=+255765450573').catch(() => {
-        alert('Make sure WhatsApp is installed on your device.');
+        Toast.show('Make sure WhatsApp is installed on your device.');
       });
     });
   };
@@ -121,19 +122,19 @@ export default function GalleryScreen({ onSelectMedia }: GalleryScreenProps) {
   );
 
   const renderItem = ({ item }: { item: MediaLibrary.Asset }) => {
-    const isSelected = selectedPhotos.includes(item.uri);
+    const isSelected = selectedPhotos.includes(item.id);
     return (
       <TouchableOpacity 
         style={styles.gridItem} 
         onPress={async () => {
           if (mediaType === 'photo') {
             setSelectedPhotos(prev => {
-              if (prev.includes(item.uri)) return prev.filter(uri => uri !== item.uri);
+              if (prev.includes(item.id)) return prev.filter(id => id !== item.id);
               if (prev.length >= 10) {
-                alert('You can only select up to 10 photos at a time.');
+                Toast.show('You can only select up to 10 photos at a time.');
                 return prev;
               }
-              return [...prev, item.uri];
+              return [...prev, item.id];
             });
             return;
           }
@@ -227,7 +228,20 @@ export default function GalleryScreen({ onSelectMedia }: GalleryScreenProps) {
         <View style={styles.nextButtonContainer}>
           <TouchableOpacity 
             style={styles.nextButton} 
-            onPress={() => onSelectMedia(selectedPhotos, 'photo')}
+            onPress={async () => {
+              setLoading(true);
+              const resolvedUris: string[] = [];
+              for (const id of selectedPhotos) {
+                try {
+                  const info = await MediaLibrary.getAssetInfoAsync(id);
+                  resolvedUris.push(info.localUri || info.uri);
+                } catch (e) {
+                  resolvedUris.push(id); // fallback
+                }
+              }
+              setLoading(false);
+              onSelectMedia(resolvedUris, 'photo');
+            }}
             activeOpacity={0.8}
           >
             <Text style={styles.nextButtonText}>Next ({selectedPhotos.length})</Text>

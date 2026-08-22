@@ -12,6 +12,9 @@ import EditorScreen from './components/EditorScreen';
 import PhotoCompressScreen from './components/PhotoCompressScreen';
 import { Ionicons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
+import { Toast } from './utils/Toast';
+import ToastProvider from './components/ToastProvider';
+import { DeviceEventEmitter } from 'react-native';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -239,41 +242,35 @@ function App() {
       if (result.success) {
         setProcessedUris(result.outputUris);
       } else {
-        alert('Processing failed:\n' + result.error);
+        Toast.show('Processing failed:\n' + result.error);
       }
     } catch (err: any) {
       setIsProcessing(false);
-      alert('Crash caught:\n' + (err?.message ?? String(err)));
+      Toast.show('Crash caught:\n' + (err?.message ?? String(err)));
     }
   };
 
   const handleShare = async (uris: string[]) => {
-    if (uris.length === 0) {
-      alert('No files to share.');
-      return;
-    }
     try {
-      const available = await Sharing.isAvailableAsync();
-      if (!available) {
-        alert('Sharing is not available on this device.');
+      if (uris.length === 0) {
+        Toast.show('No files to share.');
         return;
       }
-
-      // Resolve ph:// or assets-library:// to local cache file
-      let shareUri = uris[0];
-      if (shareUri.startsWith('ph://') || shareUri.startsWith('assets-library://')) {
-        const ext = shareUri.includes('.jpg') || shareUri.includes('.jpeg') ? 'jpg' : 'mp4';
-        const localUri = ((FileSystem as any).cacheDirectory as string) + `share_media.${ext}`;
-        // Remove existing cached file first
-        const existing = await FileSystem.getInfoAsync(localUri);
-        if (existing.exists) await FileSystem.deleteAsync(localUri, { idempotent: true });
-        await FileSystem.copyAsync({ from: shareUri, to: localUri });
-        shareUri = localUri;
+      const isAvailable = await Sharing.isAvailableAsync();
+      if (!isAvailable) {
+        Toast.show('Sharing is not available on this device.');
+        return;
       }
-
-      await Sharing.shareAsync(shareUri, { dialogTitle: 'Share via WhatsApp' });
+      
+      const shareUris = [...uris];
+      
+      await Sharing.shareAsync(shareUris[0], {
+        mimeType: selectedMedia?.type === 'video' ? 'video/mp4' : 'image/jpeg',
+        dialogTitle: 'Share to WhatsApp',
+        UTI: selectedMedia?.type === 'video' ? 'public.mpeg-4' : 'public.jpeg'
+      });
     } catch (e: any) {
-      alert('Share failed: ' + (e?.message ?? String(e)));
+      Toast.show('Share failed: ' + (e?.message ?? String(e)));
     }
   };
 
@@ -281,18 +278,18 @@ function App() {
     try {
       const { status } = await MediaLibrary.requestPermissionsAsync();
       if (status !== 'granted') {
-        alert('Camera Roll permission is required. Please allow it in iPhone Settings → Privacy → Photos.');
+        Toast.show('Camera Roll permission is required. Please allow it in Settings.');
         return;
       }
-
+      
       let saved = 0;
       for (const uri of uris) {
         await MediaLibrary.saveToLibraryAsync(uri);
         saved++;
       }
-      alert(`✅ Saved ${saved} file${saved > 1 ? 's' : ''} to your Camera Roll!`);
+      Toast.show(`Saved ${saved} file${saved > 1 ? 's' : ''} to your Camera Roll.`);
     } catch (e: any) {
-      alert('Save failed: ' + (e?.message ?? String(e)));
+      Toast.show('Save failed: ' + (e?.message ?? String(e)));
     }
   };
 
