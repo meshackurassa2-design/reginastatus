@@ -91,6 +91,15 @@ export const compressAndSplitVideo = async (
       }
     }
 
+    // Ensure font for watermark exists
+    const fontPath = ((FileSystem as any).cacheDirectory as string) + 'Roboto.ttf';
+    const fontInfo = await FileSystem.getInfoAsync(fontPath);
+    if (!fontInfo.exists) {
+      const { robotoBase64 } = require('./RobotoBase64');
+      await FileSystem.writeAsStringAsync(fontPath, robotoBase64, { encoding: FileSystem.EncodingType.Base64 });
+    }
+    const fontPathForFfmpeg = fontPath.replace('file://', '');
+
     // Build filter_complex
     let filterComplex = '';
     const sanitizedWatermark = watermarkText
@@ -100,7 +109,7 @@ export const compressAndSplitVideo = async (
       .replace(/\[/g, '\\[')
       .replace(/\]/g, '\\]');
 
-    const videoFilter = `scale=-2:720,drawtext=text='${sanitizedWatermark}':fontcolor=white:fontsize=28:x=w-tw-16:y=h-th-16:shadowcolor=black:shadowx=2:shadowy=2`;
+    const videoFilter = `scale=-2:720,drawtext=fontfile='${fontPathForFfmpeg}':text='${sanitizedWatermark}':fontcolor=white:fontsize=28:x=w-tw-16:y=h-th-16:shadowcolor=black:shadowx=2:shadowy=2`;
 
     if (musicForFfmpeg) {
       filterComplex = `[0:v]${videoFilter}[vout];[0:a]volume=${videoVolume}[a1];[1:a]volume=${musicVolume}[a2];[a1][a2]amix=inputs=2:duration=first:dropout_transition=2[aout]`;
