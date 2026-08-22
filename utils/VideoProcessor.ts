@@ -22,25 +22,29 @@ export interface ProcessResult {
 
 /**
  * Resolves any URI (ph://, assets-library://, file://) to a local cache path.
+ * We ALWAYS copy the file to the app's cache directory first to guarantee
+ * that react-native-compressor has sandbox read permissions, preventing "Setup failure".
  */
 const resolveUri = async (uri: string, name: string): Promise<string> => {
   if (!uri) throw new Error('Empty URI provided');
 
   const cacheDir = (FileSystem as any).cacheDirectory as string;
+  const dest = `${cacheDir}${name}.mp4`;
 
+  // Delete existing
+  const existing = await FileSystem.getInfoAsync(dest);
+  if (existing.exists) await FileSystem.deleteAsync(dest, { idempotent: true });
+  
   if (uri.startsWith('ph://') || uri.startsWith('assets-library://')) {
-    const dest = `${cacheDir}${name}.mp4`;
-    // Delete existing
-    const existing = await FileSystem.getInfoAsync(dest);
-    if (existing.exists) await FileSystem.deleteAsync(dest, { idempotent: true });
-    
     await FileSystem.copyAsync({ from: uri, to: dest });
-    return dest;
+  } else if (uri.startsWith('file://')) {
+    await FileSystem.copyAsync({ from: uri, to: dest });
+  } else {
+    // If it's something else, try copying anyway
+    await FileSystem.copyAsync({ from: uri, to: dest });
   }
 
-  if (uri.startsWith('file://')) return uri;
-
-  return uri;
+  return dest;
 };
 
 /**

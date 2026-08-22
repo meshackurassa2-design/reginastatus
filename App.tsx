@@ -346,13 +346,24 @@ function App() {
               try {
                 const ImageManipulator = require('expo-image-manipulator');
                 const compressed: string[] = [];
+                let idx = 0;
                 for (const uri of selectedMedia.uris) {
+                  // Resolve ph:// to file:// by copying to cache
+                  let localUri = uri;
+                  if (uri.startsWith('ph://') || uri.startsWith('assets-library://')) {
+                    localUri = ((FileSystem as any).cacheDirectory as string) + `temp_img_${idx}.jpg`;
+                    const existing = await FileSystem.getInfoAsync(localUri);
+                    if (existing.exists) await FileSystem.deleteAsync(localUri, { idempotent: true });
+                    await FileSystem.copyAsync({ from: uri, to: localUri });
+                  }
+                  
                   const result = await ImageManipulator.manipulateAsync(
-                    uri,
+                    localUri,
                     [{ resize: { width: 1080 } }],
                     { compress: 0.85, format: ImageManipulator.SaveFormat.JPEG }
                   );
                   compressed.push(result.uri);
+                  idx++;
                 }
                 setIsProcessing(false);
                 setProcessedUris(compressed);
