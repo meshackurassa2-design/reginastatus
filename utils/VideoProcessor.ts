@@ -138,8 +138,8 @@ export const compressAndSplitVideo = async (
       maps += ` -map 0:a?`;
     }
 
-    // PURE STATUS ALGORITHM: max 1280p scaling, libx264, -crf 24, strict bitrate limits, segment 30s
-    const ffmpegCommand = `${inputs} -filter_complex "${filterComplex}" ${maps} -c:v libx264 -crf 24 -maxrate 2.5M -bufsize 5.0M -preset ultrafast -c:a aac -b:a 128k -f segment -segment_time 30 -reset_timestamps 1 "${outputPattern}"`;
+    // PURE STATUS ALGORITHM: max 1280p scaling, libx264, -crf 22, strict bitrate limits, segment 30s
+    const ffmpegCommand = `${inputs} -filter_complex "${filterComplex}" ${maps} -c:v libx264 -crf 22 -maxrate 3.0M -bufsize 6.0M -preset ultrafast -c:a aac -b:a 128k -f segment -segment_time 30 -reset_timestamps 1 "${outputPattern}"`;
 
     console.log('[ReginaStatus] FFmpeg command:', ffmpegCommand);
 
