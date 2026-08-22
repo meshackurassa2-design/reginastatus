@@ -281,17 +281,12 @@ function App() {
     try {
       const { status } = await MediaLibrary.requestPermissionsAsync();
       if (status !== 'granted') {
-        alert('Camera Roll permission is required to save files. Please allow it in Settings.');
+        alert('Camera Roll permission is required. Please allow it in iPhone Settings → Privacy → Photos.');
         return;
       }
 
       let saved = 0;
       for (const uri of uris) {
-        // ph:// assets are ALREADY in the library — skip them
-        if (uri.startsWith('ph://') || uri.startsWith('assets-library://')) {
-          saved++;
-          continue;
-        }
         await MediaLibrary.saveToLibraryAsync(uri);
         saved++;
       }
@@ -345,14 +340,26 @@ function App() {
           <PhotoCompressScreen
             photoUris={selectedMedia.uris}
             onClose={() => setSelectedMedia(null)}
-            onCompress={(watermarkStr) => {
+            onCompress={async (watermarkStr) => {
               setIsProcessing(true);
               setProcessedUris([]);
-              // Mock compression delay
-              setTimeout(() => {
+              try {
+                const ImageManipulator = await import('expo-image-manipulator');
+                const compressed: string[] = [];
+                for (const uri of selectedMedia.uris) {
+                  const result = await ImageManipulator.manipulateAsync(
+                    uri,
+                    [{ resize: { width: 1080 } }],
+                    { compress: 0.85, format: ImageManipulator.SaveFormat.JPEG }
+                  );
+                  compressed.push(result.uri);
+                }
                 setIsProcessing(false);
-                setProcessedUris(selectedMedia.uris);
-              }, 2000);
+                setProcessedUris(compressed);
+              } catch (e: any) {
+                setIsProcessing(false);
+                alert('Photo processing failed: ' + (e?.message ?? String(e)));
+              }
             }}
           />
         )}
