@@ -4,7 +4,6 @@
  * Uses react-native-compressor to heavily compress the video for WhatsApp.
  */
 import * as FileSystem from 'expo-file-system/legacy';
-import { Video as RNCompressor } from 'react-native-compressor';
 
 export interface VideoProcessingOptions {
   trimStartMillis?: number;
@@ -59,6 +58,7 @@ export const compressAndSplitVideo = async (
     const localUri = await resolveUri(inputUri, 'rs_source_video');
 
     // Step 2: Compress the video heavily for WhatsApp Status
+    const { Video: RNCompressor } = require('react-native-compressor');
     const compressedUri = await RNCompressor.compress(
       localUri,
       {
