@@ -164,7 +164,7 @@ const SuccessAnimation = ({ uris, shareClip, saveClip }: { uris: string[], share
   );
 };
 
-export default function App() {
+function App() {
   const [isSplashVisible, setIsSplashVisible] = useState(true);
   const splashScale = useRef(new Animated.Value(0.8)).current;
   const splashOpacity = useRef(new Animated.Value(0)).current;
@@ -478,4 +478,4 @@ const WrappedApp = () => (
   </ErrorBoundary>
 );
 
-module.exports = WrappedApp;
+export default WrappedApp;
