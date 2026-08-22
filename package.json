@@ -21,15 +21,7 @@
     "expo-video-thumbnails": "~10.0.8",
     "react": "19.1.0",
     "react-native": "0.81.5",
-    "@nikhil-cephei/ffmpeg-kit-react-native": "^6.0.12"
-  },
-  "@nikhil-cephei/ffmpeg-kit-react-native": {
-    "ios": {
-      "package": "min-gpl"
-    },
-    "android": {
-      "package": "min-gpl"
-    }
+    "ffmpeg-kit-extended": "^0.6.1"
   },
   "devDependencies": {
     "@types/node": "^26.2.0",

@@ -45,28 +45,105 @@ export const compressAndSplitVideo = async (
   options: VideoProcessingOptions = {}
 ): Promise<ProcessResult> => {
   try {
-    // FFmpeg-kit-react-native is physically incompatible with React Native 0.76 New Architecture.
-    // Calling require() on it causes an instant native hard crash (EXC_BAD_ACCESS) that cannot be caught by try/catch.
-    // To respect the user's time and stop the app from crashing, we bypass it.
-    
-    // Instead of crashing, let's just copy the raw video to the output directory so it actually saves!
+    const { FFmpegKit, ReturnCode } = require('ffmpeg-kit-extended');
+
+    const {
+      trimStartMillis = 0,
+      trimEndMillis = durationMillis,
+      watermarkText = 'ReginaStatus',
+      musicUri = null,
+      videoVolume = 1.0,
+      musicVolume = 1.0,
+    } = options;
+
+    // Resolve input URI to a real file path
+    const safeInput = await resolveUri(inputUri, 'rs_input_video');
+    const inputForFfmpeg = safeInput.replace('file://', '');
+
+    // Set up output directory
     const outputDir = ((FileSystem as any).cacheDirectory as string) + 'reginastatus_exports/';
     const dirInfo = await FileSystem.getInfoAsync(outputDir);
     if (!dirInfo.exists) {
       await FileSystem.makeDirectoryAsync(outputDir, { intermediates: true });
     }
-    
-    const safeInput = await resolveUri(inputUri, 'rs_input_video');
+
     const timestamp = Date.now();
-    const dest = `${outputDir}output_${timestamp}_000.mp4`;
-    
-    await FileSystem.copyAsync({ from: safeInput, to: dest });
-    
-    return {
-      success: true,
-      outputUris: [dest],
-      // We don't return an error here so the "Saved" alert still shows and the user isn't blocked.
-    };
+    const outputPattern = `${outputDir.replace('file://', '')}output_${timestamp}_%03d.mp4`;
+
+    const startSec = trimStartMillis / 1000;
+    const endSec = trimEndMillis / 1000;
+    const durationSec = Math.max(endSec - startSec, 1);
+
+    // Build inputs
+    let inputs = `-ss ${startSec} -t ${durationSec} -i "${inputForFfmpeg}"`;
+
+    let musicForFfmpeg: string | null = null;
+    if (musicUri) {
+      try {
+        const safeMusic = await resolveUri(musicUri, 'rs_input_music');
+        musicForFfmpeg = safeMusic.replace('file://', '');
+        inputs += ` -i "${musicForFfmpeg}"`;
+      } catch (_) {
+        musicForFfmpeg = null;
+      }
+    }
+
+    // Build filter_complex
+    let filterComplex = '';
+    const sanitizedWatermark = watermarkText
+      .replace(/\\/g, '\\\\')
+      .replace(/:/g, '\\:')
+      .replace(/'/g, "\\'")
+      .replace(/\[/g, '\\[')
+      .replace(/\]/g, '\\]');
+
+    const videoFilter = `scale=-2:720,drawtext=text='${sanitizedWatermark}':fontcolor=white:fontsize=28:x=w-tw-16:y=h-th-16:shadowcolor=black:shadowx=2:shadowy=2`;
+
+    if (musicForFfmpeg) {
+      filterComplex = `[0:v]${videoFilter}[vout];[0:a]volume=${videoVolume}[a1];[1:a]volume=${musicVolume}[a2];[a1][a2]amix=inputs=2:duration=first:dropout_transition=2[aout]`;
+    } else if (videoVolume !== 1.0) {
+      filterComplex = `[0:v]${videoFilter}[vout];[0:a]volume=${videoVolume}[aout]`;
+    } else {
+      filterComplex = `[0:v]${videoFilter}[vout]`;
+    }
+
+    // Map outputs
+    let maps = `-map "[vout]"`;
+    if (musicForFfmpeg || videoVolume !== 1.0) {
+      maps += ` -map "[aout]"`;
+    } else {
+      maps += ` -map 0:a?`;
+    }
+
+    // PURE STATUS ALGORITHM: scale to 720p (in filter), libx264, -crf 24, segment 30s
+    const ffmpegCommand = `${inputs} -filter_complex "${filterComplex}" ${maps} -c:v libx264 -crf 24 -preset ultrafast -c:a aac -b:a 128k -f segment -segment_time 30 -reset_timestamps 1 "${outputPattern}"`;
+
+    console.log('[ReginaStatus] FFmpeg command:', ffmpegCommand);
+
+    const session = await FFmpegKit.execute(ffmpegCommand);
+    const returnCode = await session.getReturnCode();
+
+    if (ReturnCode.isSuccess(returnCode)) {
+      const files = await FileSystem.readDirectoryAsync(outputDir);
+      const generatedFiles = files
+        .filter(f => f.startsWith(`output_${timestamp}_`))
+        .sort()
+        .map(f => `file://${outputDir}${f}`);
+
+      if (generatedFiles.length === 0) {
+        return { success: false, outputUris: [], error: 'FFmpeg ran but produced no output files.' };
+      }
+
+      return { success: true, outputUris: generatedFiles };
+    } else {
+      const logs = await session.getLogsAsString();
+      console.error('[ReginaStatus] FFmpeg failed:', logs);
+      return {
+        success: false,
+        outputUris: [],
+        error: 'Video processing failed with FFmpeg error. ' + (logs?.substring(0, 100) ?? ''),
+      };
+    }
   } catch (err: any) {
     console.error('[ReginaStatus] VideoProcessor error:', err);
     return {
