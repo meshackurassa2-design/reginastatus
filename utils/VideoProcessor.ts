@@ -1,12 +1,10 @@
 /**
- * VideoProcessor — Pure Expo implementation (no FFmpeg)
+ * VideoProcessor — Pure Expo + React Native Compressor implementation
  *
- * Uses expo-file-system + expo-av to copy and save video segments.
- * Watermark is applied as a UI overlay (burned-in watermark requires a
- * future server-side step or a stable native build).
+ * Uses react-native-compressor to heavily compress the video for WhatsApp.
  */
 import * as FileSystem from 'expo-file-system/legacy';
-import { Audio, Video } from 'expo-av';
+import { Video as RNCompressor } from 'react-native-compressor';
 
 export interface VideoProcessingOptions {
   trimStartMillis?: number;
@@ -33,6 +31,10 @@ const resolveUri = async (uri: string, name: string): Promise<string> => {
 
   if (uri.startsWith('ph://') || uri.startsWith('assets-library://')) {
     const dest = `${cacheDir}${name}.mp4`;
+    // Delete existing
+    const existing = await FileSystem.getInfoAsync(dest);
+    if (existing.exists) await FileSystem.deleteAsync(dest, { idempotent: true });
+    
     await FileSystem.copyAsync({ from: uri, to: dest });
     return dest;
   }
@@ -45,12 +47,7 @@ const resolveUri = async (uri: string, name: string): Promise<string> => {
 /**
  * Main processing function.
  *
- * Since FFmpegKit is not available in sideloaded IPAs, this implementation:
- * 1. Resolves the video URI to a real local file.
- * 2. Copies it (or trims by duration metadata) into the output directory.
- * 3. Returns the output URIs for the gallery/share flow.
- *
- * Full compression + watermark burn-in will be added in a future update.
+ * Compresses the video using react-native-compressor so it fits perfectly on WhatsApp.
  */
 export const compressAndSplitVideo = async (
   inputUri: string,
@@ -61,39 +58,38 @@ export const compressAndSplitVideo = async (
     // Step 1: resolve to a local file URI
     const localUri = await resolveUri(inputUri, 'rs_source_video');
 
-    // Step 2: set up output directory
-    const cacheDir = (FileSystem as any).cacheDirectory as string;
-    const outputDir = `${cacheDir}reginastatus_exports/`;
-    const dirInfo = await FileSystem.getInfoAsync(outputDir);
-    if (!dirInfo.exists) {
-      await FileSystem.makeDirectoryAsync(outputDir, { intermediates: true });
-    }
+    // Step 2: Compress the video heavily for WhatsApp Status
+    const compressedUri = await RNCompressor.compress(
+      localUri,
+      {
+        compressionMethod: 'auto',
+        minimumFileSizeForCompress: 0,
+      },
+      (progress) => {
+        console.log('[ReginaStatus] Video Compression Progress: ', progress);
+      }
+    );
 
-    // Step 3: copy the resolved file to the output directory
-    const timestamp = Date.now();
-    const outputUri = `${outputDir}output_${timestamp}_001.mp4`;
-    await FileSystem.copyAsync({ from: localUri, to: outputUri });
-
-    // Verify the output exists and has size > 0
-    const info = await FileSystem.getInfoAsync(outputUri);
-    if (!info.exists || (info as any).size === 0) {
+    // Verify the output exists
+    const info = await FileSystem.getInfoAsync(compressedUri);
+    if (!info.exists) {
       return {
         success: false,
         outputUris: [],
-        error: 'Output file is empty or missing after copy.',
+        error: 'Output file is empty or missing after compression.',
       };
     }
 
     return {
       success: true,
-      outputUris: [outputUri],
+      outputUris: [compressedUri],
     };
   } catch (err: any) {
     console.error('[VideoProcessor] Error:', err);
     return {
       success: false,
       outputUris: [],
-      error: err?.message ?? 'Unknown error during video processing.',
+      error: err?.message ?? 'Unknown error during video compression.',
     };
   }
 };
