@@ -5,7 +5,7 @@ import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as MediaLibrary from 'expo-media-library';
-// VideoProcessor is loaded lazily to prevent native module crash at startup
+import { compressAndSplitVideo } from './utils/VideoProcessor';
 import OnboardingScreen from './components/OnboardingScreen';
 import GalleryScreen from './components/GalleryScreen';
 import EditorScreen from './components/EditorScreen';
@@ -229,8 +229,7 @@ function App() {
     setIsProcessing(true);
     setProcessedUris([]);
     
-    // Lazy import to prevent native module crash at startup
-    const { compressAndSplitVideo } = await import('./utils/VideoProcessor');
+    // Lazy-safe: ffmpeg is loaded via require() inside VideoProcessor
     const result = await compressAndSplitVideo(selectedMedia.uris[0], options.trimEndMillis, options);
     
     try { LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut); } catch (_) {}
