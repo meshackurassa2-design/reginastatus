@@ -194,12 +194,20 @@ export default function App() {
     setIsOnboarded(true);
   };
 
-  const processVideo = async (durationMillis: number) => {
+  const processVideo = async (options: {
+    trimStartMillis: number;
+    trimEndMillis: number;
+    watermarkText: string;
+    musicUri: string | null;
+    videoVolume: number;
+    musicVolume: number;
+  }) => {
     if (!selectedMedia || selectedMedia.type !== 'video') return;
     setIsProcessing(true);
     setProcessedUris([]);
     
-    const result = await compressAndSplitVideo(selectedMedia.uris[0], durationMillis);
+    // The duration in compressAndSplitVideo originally was the total duration, we can pass trimEndMillis for it
+    const result = await compressAndSplitVideo(selectedMedia.uris[0], options.trimEndMillis, options);
     
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     
@@ -221,7 +229,7 @@ export default function App() {
       
       let shareUri = uris[0];
       if (shareUri.startsWith('ph://')) {
-        const localUri = FileSystem.cacheDirectory + 'share_media.mp4';
+        const localUri = (FileSystem as any).cacheDirectory + 'share_media.mp4';
         await FileSystem.copyAsync({ from: shareUri, to: localUri });
         shareUri = localUri;
       }

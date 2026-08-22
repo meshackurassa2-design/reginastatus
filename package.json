@@ -22,7 +22,16 @@
     "react": "19.1.0",
     "react-native": "0.81.5"
   },
+  "ffmpeg-kit-react-native": {
+    "ios": {
+      "package": "min-gpl"
+    },
+    "android": {
+      "package": "min-gpl"
+    }
+  },
   "devDependencies": {
+    "@types/node": "^26.2.0",
     "@types/react": "~19.2.2",
     "typescript": "~6.0.3"
   },

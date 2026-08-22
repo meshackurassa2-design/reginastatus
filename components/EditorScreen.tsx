@@ -13,7 +13,14 @@ const TRIMMER_WIDTH = width - 44; // 22 padding on each side
 interface EditorScreenProps {
   videoUri: string;
   onDiscard: () => void;
-  onSave: (trimmedDurationMillis: number) => void;
+  onSave: (options: {
+    trimStartMillis: number;
+    trimEndMillis: number;
+    watermarkText: string;
+    musicUri: string | null;
+    videoVolume: number;
+    musicVolume: number;
+  }) => void;
 }
 
 type EditorMode = 'default' | 'trim' | 'text' | 'music' | 'watermark';
@@ -69,7 +76,7 @@ export default function EditorScreen({ videoUri, onDiscard, onSave }: EditorScre
   const [isReady, setIsReady] = useState(false);
   const [mode, setMode] = useState<EditorMode>('default');
   const [showPlayButton, setShowPlayButton] = useState(false);
-  const playButtonTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   
   const changeMode = (newMode: EditorMode) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -107,6 +114,7 @@ export default function EditorScreen({ videoUri, onDiscard, onSave }: EditorScre
   const trimStartRef = useRef(0);
   const trimEndRef = useRef(0);
   const musicSoundRef = useRef<Audio.Sound | null>(null);
+  const playButtonTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Slider UI positions
   const [trimLeft, setTrimLeft] = useState(0);
@@ -598,7 +606,14 @@ export default function EditorScreen({ videoUri, onDiscard, onSave }: EditorScre
               <Text style={[styles.actionText, { color: '#FF3B30', fontSize: 11 * scale }]}>Discard</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.actionButton} onPress={() => onSave(trimEnd - trimLeft)}>
+            <TouchableOpacity style={styles.actionButton} onPress={() => onSave({
+              trimStartMillis: trimStart,
+              trimEndMillis: trimEnd,
+              watermarkText: watermarkName ? `ReginaStatus • ${watermarkName}` : 'ReginaStatus',
+              musicUri: selectedAudio ? null /* Add real audio picking logic if needed */ : null,
+              videoVolume,
+              musicVolume
+            })}>
               <View style={[styles.actionIconCircle, { backgroundColor: '#32CD32' }]}>
                 <Ionicons name="checkmark" size={20 * scale} color="#FFF" />
               </View>
