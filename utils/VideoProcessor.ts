@@ -144,7 +144,7 @@ export const compressAndSplitVideo = async (
       return {
         success: false,
         outputUris: [],
-        error: 'Video processing failed with FFmpeg error. ' + (logs?.substring(0, 100) ?? ''),
+        error: 'Video processing failed with FFmpeg error. ' + (logs?.substring(logs.length - 200) ?? ''),
       };
     }
   } catch (err: any) {
