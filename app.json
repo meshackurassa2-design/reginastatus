@@ -5,22 +5,52 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "dark",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": false,
+      "bundleIdentifier": "com.cmdss.reginastatus",
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "ReginaStatus needs access to your photo library to pick videos and photos for WhatsApp Status.",
+        "NSPhotoLibraryAddUsageDescription": "ReginaStatus needs permission to save your processed videos to the Camera Roll.",
+        "NSMicrophoneUsageDescription": "ReginaStatus needs microphone access for audio processing.",
+        "NSCameraUsageDescription": "ReginaStatus needs camera access to record videos.",
+        "NSUserTrackingUsageDescription": "We use tracking to improve your experience with personalized content."
+      }
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#000000",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.cmdss.purestatus"
+      "package": "com.cmdss.purestatus",
+      "permissions": [
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_EXTERNAL_STORAGE"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Allow ReginaStatus to access your photos.",
+          "savePhotosPermission": "Allow ReginaStatus to save videos to your camera roll.",
+          "isAccessMediaLocationEnabled": true
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow ReginaStatus to access your photo library."
+        }
+      ]
+    ]
   }
 }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, Component } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, SafeAreaView, ActivityIndicator, Animated, Easing, LayoutAnimation, UIManager, Platform } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import * as FileSystem from 'expo-file-system';
@@ -15,6 +15,27 @@ import { Audio } from 'expo-av';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
+}
+
+class ErrorBoundary extends Component<{children: React.ReactNode}, {hasError: boolean, error: string}> {
+  constructor(props: any) {
+    super(props);
+    this.state = { hasError: false, error: '' };
+  }
+  static getDerivedStateFromError(error: any) {
+    return { hasError: true, error: String(error) };
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <View style={{ flex: 1, backgroundColor: '#1a0000', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+          <Text style={{ color: '#FF4444', fontSize: 22, fontWeight: 'bold', marginBottom: 16 }}>⚠️ App Error</Text>
+          <Text style={{ color: '#FFF', fontSize: 13, textAlign: 'center', fontFamily: 'monospace' }}>{this.state.error}</Text>
+        </View>
+      );
+    }
+    return this.props.children;
+  }
 }
 
 const TransferAnimation = () => {
@@ -450,3 +471,11 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 });
+
+const WrappedApp = () => (
+  <ErrorBoundary>
+    <App />
+  </ErrorBoundary>
+);
+
+module.exports = WrappedApp;
