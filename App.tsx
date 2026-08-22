@@ -348,26 +348,21 @@ function App() {
               setIsProcessing(true);
               setProcessedUris([]);
               try {
-                // Dynamically import to prevent native module crashes on startup
-                const ImageManipulator = await import('expo-image-manipulator');
+                const { processPhoto } = await import('./utils/VideoProcessor');
                 const compressed: string[] = [];
-                let idx = 0;
                 for (const uri of selectedMedia.uris) {
-                  const localUri = uri;
-                  
-                  const result = await ImageManipulator.manipulateAsync(
-                    localUri,
-                    [{ resize: { width: 1080 } }],
-                    { compress: 0.85, format: ImageManipulator.SaveFormat.JPEG }
-                  );
-                  compressed.push(result.uri);
-                  idx++;
+                  const result = await processPhoto(uri, watermarkStr);
+                  if (result.success && result.outputUri) {
+                    compressed.push(result.outputUri);
+                  } else {
+                    throw new Error(result.error || 'Failed to process photo');
+                  }
                 }
                 setIsProcessing(false);
                 setProcessedUris(compressed);
               } catch (e: any) {
                 setIsProcessing(false);
-                alert('Photo processing failed: ' + (e?.message ?? String(e)));
+                Toast.show('Photo processing failed: ' + (e?.message ?? String(e)));
               }
             }}
           />

@@ -178,3 +178,73 @@ export const compressAndSplitVideo = async (
     };
   }
 };
+
+export const processPhoto = async (
+  inputUri: string,
+  watermarkText: string = 'ReginaStatus'
+): Promise<{ success: boolean; outputUri?: string; error?: string }> => {
+  try {
+    FFmpegKitExtended.initialize();
+
+    const safeInput = await resolveUri(inputUri, `rs_input_photo_${Date.now()}`);
+    const inputForFfmpeg = safeInput.replace('file://', '');
+
+    const outputDir = ((FileSystem as any).cacheDirectory as string) + 'reginastatus_exports/';
+    const dirInfo = await FileSystem.getInfoAsync(outputDir);
+    if (!dirInfo.exists) {
+      await FileSystem.makeDirectoryAsync(outputDir, { intermediates: true });
+    }
+
+    const timestamp = Date.now();
+    const outputPath = `${outputDir}output_photo_${timestamp}.jpg`;
+    const outputForFfmpeg = outputPath.replace('file://', '');
+
+    const fontPath = ((FileSystem as any).cacheDirectory as string) + 'Roboto.ttf';
+    const fontInfo = await FileSystem.getInfoAsync(fontPath);
+    if (!fontInfo.exists) {
+      const { robotoBase64 } = require('./RobotoBase64');
+      await FileSystem.writeAsStringAsync(fontPath, robotoBase64, { encoding: FileSystem.EncodingType.Base64 });
+    }
+    const fontPathForFfmpeg = fontPath.replace('file://', '');
+
+    const customName = watermarkText !== 'ReginaStatus' ? watermarkText.replace('ReginaStatus • ', '') : '';
+    const scaleFilter = `scale='w=if(gt(iw,ih),min(iw,1280),-2):h=if(gt(iw,ih),-2,min(ih,1280))'`;
+    const yBase = customName ? 80 : 50;
+
+    const badgeFilter = `drawtext=fontfile='${fontPathForFfmpeg}':text='HD':fontcolor=black:fontsize=16:box=1:boxcolor=white:boxborderw=6:x=w-tw-240:y=h-th-${yBase + 34}`;
+    const titleFilter = `drawtext=fontfile='${fontPathForFfmpeg}':text='ReginaStatus':fontcolor=white:fontsize=32:shadowcolor=black@0.6:shadowx=2:shadowy=2:x=w-tw-40:y=h-th-${yBase + 28}`;
+    const subtitleFilter = `drawtext=fontfile='${fontPathForFfmpeg}':text='Upload Status in Full HD':fontcolor=white@0.9:fontsize=20:shadowcolor=black@0.6:shadowx=2:shadowy=2:x=w-tw-40:y=h-th-${yBase}`;
+
+    let videoFilter = `${scaleFilter},${badgeFilter},${titleFilter},${subtitleFilter}`;
+
+    if (customName) {
+      const sanitizedName = customName.replace(/\\/g, '\\\\').replace(/:/g, '\\:').replace(/'/g, "\\'");
+      const nameFilter = `drawtext=fontfile='${fontPathForFfmpeg}':text='by ${sanitizedName}':fontcolor=#FFD700:fontsize=22:shadowcolor=black@0.6:shadowx=2:shadowy=2:x=w-tw-40:y=h-th-30`;
+      videoFilter += `,${nameFilter}`;
+    }
+
+    const ffmpegCommand = `-i "${inputForFfmpeg}" -vf "${videoFilter}" -q:v 2 -y "${outputForFfmpeg}"`;
+    
+    console.log('[ReginaStatus] FFmpeg Photo command:', ffmpegCommand);
+
+    const session = await FFmpegKit.executeAsync(ffmpegCommand);
+    const returnCode = await session.getReturnCode();
+
+    if (isSuccessReturnCode(returnCode)) {
+      return { success: true, outputUri: `file://${outputForFfmpeg}` };
+    } else {
+      const logs = await session.getLogsAsString();
+      console.error('[ReginaStatus] FFmpeg Photo failed:', logs);
+      return {
+        success: false,
+        error: 'Photo processing failed with FFmpeg error. ' + (logs?.substring(logs.length - 200) ?? ''),
+      };
+    }
+  } catch (err: any) {
+    console.error('[ReginaStatus] PhotoProcessor error:', err);
+    return {
+      success: false,
+      error: err?.message ?? 'Unknown photo processing error.',
+    };
+  }
+};
