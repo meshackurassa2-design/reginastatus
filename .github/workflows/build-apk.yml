@@ -36,7 +36,8 @@ jobs:
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleRelease --no-daemon
+          # Specifically target :app:assembleRelease to avoid triggering bundleReleaseAar on ffmpeg-kit library subproject
+          ./gradlew :app:assembleRelease -x lint -x test --no-daemon
 
       - name: Prepare APK Artifact
         run: |
