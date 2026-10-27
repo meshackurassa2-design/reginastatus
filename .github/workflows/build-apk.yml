@@ -32,16 +32,17 @@ jobs:
       - name: Prebuild Android
         run: npx expo prebuild --platform android --clean
 
-      - name: Configure Android SDK properties
+      - name: Configure Android minSdkVersion 26
         run: |
-          # ffmpeg-kit-extended requires minSdkVersion 26
-          echo "android.minSdkVersion=26" >> android/gradle.properties
+          # ffmpeg-kit-extended requires minSdkVersion 26 defined in rootProject.ext
+          sed -i 's/buildscript {/buildscript {\n  ext {\n    minSdkVersion = 26\n  }/' android/build.gradle
+          cat android/build.gradle | head -n 12
 
       - name: Build Android Release APK
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew :app:assembleRelease -Pandroid.minSdkVersion=26 -PminSdkVersion=26 -x lint -x test --no-daemon
+          ./gradlew :app:assembleRelease -x lint -x test --no-daemon
 
       - name: Prepare APK Artifact
         run: |
