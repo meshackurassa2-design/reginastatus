@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, Component } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, SafeAreaView, ActivityIndicator, Animated, Easing, LayoutAnimation, UIManager, Platform } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity, SafeAreaView, ActivityIndicator, Animated, Easing, LayoutAnimation, UIManager, Platform, ScrollView } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
@@ -79,7 +79,7 @@ const TransferAnimation = () => {
   );
 };
 
-const SuccessAnimation = ({ uris, shareClip, saveClip }: { uris: string[], shareClip: (uris: string[]) => void, saveClip: (uris: string[]) => void }) => {
+const SuccessAnimation = ({ uris, shareClip, saveClip }: { uris: string[], shareClip: (uri: string) => Promise<boolean>, saveClip: (uris: string[]) => Promise<boolean> }) => {
   const checkScale = useRef(new Animated.Value(0)).current;
   const contentOpacity = useRef(new Animated.Value(0)).current;
   const contentTranslateY = useRef(new Animated.Value(20)).current;
@@ -87,6 +87,26 @@ const SuccessAnimation = ({ uris, shareClip, saveClip }: { uris: string[], share
   const buttonsTranslateY = useRef(new Animated.Value(20)).current;
   
   const [isSaved, setIsSaved] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [sharedParts, setSharedParts] = useState<boolean[]>(() => uris.map(() => false));
+  const isMultiPart = uris.length > 1;
+  const isVideo = uris[0]?.toLowerCase().endsWith('.mp4');
+  const itemLabel = isVideo ? 'Part' : 'Photo';
+  const nextPartIndex = sharedParts.findIndex(shared => !shared);
+
+  const sharePart = async (index: number) => {
+    const ok = await shareClip(uris[index]);
+    if (ok) {
+      setSharedParts(prev => prev.map((v, i) => (i === index ? true : v)));
+    }
+  };
+
+  const saveAll = async () => {
+    setIsSaving(true);
+    const ok = await saveClip(uris);
+    setIsSaving(false);
+    if (ok) setIsSaved(true);
+  };
 
   useEffect(() => {
     Animated.sequence([
@@ -138,37 +158,83 @@ const SuccessAnimation = ({ uris, shareClip, saveClip }: { uris: string[], share
       <Animated.View style={{ opacity: contentOpacity, transform: [{ translateY: contentTranslateY }], alignItems: 'center', width: '100%' }}>
         <Text style={styles.processingTitle}>Ready to Share</Text>
         <Text style={styles.processingSubtitle}>
-          Your video has been perfectly split and optimized for WhatsApp.
+          {isMultiPart
+            ? isVideo
+              ? `Split into ${uris.length} HD parts. Share them to your status in order, starting with Part 1.`
+              : `${uris.length} HD photos ready. Share each one to your status.`
+            : 'Optimized in HD for WhatsApp Status.'}
         </Text>
       </Animated.View>
 
       <Animated.View style={{ opacity: buttonsOpacity, transform: [{ translateY: buttonsTranslateY }], width: '100%' }}>
         <View style={styles.resultsList}>
-          <TouchableOpacity style={styles.premiumShareButton} onPress={() => shareClip(uris)}>
-            <View style={styles.whatsappIconContainer}>
-              <Ionicons name="logo-whatsapp" size={28} color="#25D366" />
-            </View>
-            <Text style={styles.premiumShareText}>
-              Share to WhatsApp
-            </Text>
-            <Ionicons name="chevron-forward" size={20} color="rgba(0,0,0,0.3)" />
-          </TouchableOpacity>
+          {isMultiPart ? (
+            <ScrollView style={styles.partsScroll} contentContainerStyle={{ gap: 10 }} showsVerticalScrollIndicator={false}>
+              {uris.map((uri, index) => {
+                const isShared = sharedParts[index];
+                const isNext = index === nextPartIndex;
+                return (
+                  <TouchableOpacity
+                    key={uri}
+                    testID={`share-part-${index + 1}`}
+                    style={[styles.partRow, isNext && styles.partRowNext, isShared && styles.partRowShared]}
+                    onPress={() => sharePart(index)}
+                    activeOpacity={0.8}
+                  >
+                    <View style={[styles.partNumber, isShared && { backgroundColor: 'rgba(37, 211, 102, 0.25)' }]}>
+                      {isShared ? (
+                        <Ionicons name="checkmark" size={18} color="#25D366" />
+                      ) : (
+                        <Text style={[styles.partNumberText, isNext && { color: '#000' }]}>{index + 1}</Text>
+                      )}
+                    </View>
+                    <Text style={[styles.partLabel, isNext && { color: '#000' }]}>
+                      {itemLabel} {index + 1} of {uris.length}
+                    </Text>
+                    <Text style={[styles.partAction, isNext && { color: '#128C7E' }, isShared && { color: '#25D366' }]}>
+                      {isShared ? 'Shared' : 'Share'}
+                    </Text>
+                    <Ionicons name="logo-whatsapp" size={22} color={isNext ? '#128C7E' : '#25D366'} />
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          ) : (
+            <TouchableOpacity testID="share-whatsapp" style={styles.premiumShareButton} onPress={() => sharePart(0)}>
+              <View style={styles.whatsappIconContainer}>
+                <Ionicons name="logo-whatsapp" size={28} color="#25D366" />
+              </View>
+              <Text style={styles.premiumShareText}>
+                {sharedParts[0] ? 'Share Again' : 'Share to WhatsApp'}
+              </Text>
+              <Ionicons name="chevron-forward" size={20} color="rgba(0,0,0,0.3)" />
+            </TouchableOpacity>
+          )}
 
           <TouchableOpacity 
+            testID="save-gallery"
             style={[styles.premiumShareButton, { backgroundColor: isSaved ? 'rgba(37, 211, 102, 0.15)' : 'rgba(255,255,255,0.05)' }]} 
-            onPress={() => {
-              saveClip(uris);
-              setIsSaved(true);
-            }}
-            disabled={isSaved}
+            onPress={saveAll}
+            disabled={isSaved || isSaving}
           >
             <View style={[styles.whatsappIconContainer, { backgroundColor: isSaved ? 'rgba(37, 211, 102, 0.25)' : 'rgba(255,255,255,0.1)' }]}>
-              <Ionicons name={isSaved ? "checkmark-done" : "download-outline"} size={24} color={isSaved ? "#25D366" : "#FFF"} />
+              {isSaving ? (
+                <ActivityIndicator size="small" color="#FFF" />
+              ) : (
+                <Ionicons name={isSaved ? "checkmark-done" : "download-outline"} size={24} color={isSaved ? "#25D366" : "#FFF"} />
+              )}
             </View>
             <Text style={[styles.premiumShareText, { color: isSaved ? '#25D366' : '#FFF' }]}>
-              {isSaved ? "Saved to Camera Roll" : "Save to Gallery"}
+              {isSaved ? "Saved to Gallery" : isMultiPart ? `Save All ${uris.length} ${itemLabel}s` : "Save to Gallery"}
             </Text>
           </TouchableOpacity>
+
+          <View style={styles.tipBox}>
+            <Ionicons name="sparkles" size={16} color="#FFD700" />
+            <Text style={styles.tipText}>
+              For best quality, tap HD in WhatsApp and don't trim or edit the clip there.
+            </Text>
+          </View>
         </View>
       </Animated.View>
     </View>
@@ -259,44 +325,50 @@ function App() {
     }
   };
 
-  const handleShare = async (uris: string[]) => {
+  // Shares a single file. expo-sharing only supports one file per share sheet,
+  // so multi-part videos are shared part-by-part from the results screen.
+  const handleShare = async (uri: string): Promise<boolean> => {
     try {
-      if (uris.length === 0) {
-        Toast.show('No files to share.');
-        return;
+      if (!uri) {
+        Toast.show('No file to share.');
+        return false;
       }
       const isAvailable = await Sharing.isAvailableAsync();
       if (!isAvailable) {
         Toast.show('Sharing is not available on this device.');
-        return;
+        return false;
       }
       
-      const shareUris = [...uris];
+      const isVideo = uri.toLowerCase().endsWith('.mp4');
       
-      await Sharing.shareAsync(shareUris[0], {
-        mimeType: selectedMedia?.type === 'video' ? 'video/mp4' : 'image/jpeg',
+      await Sharing.shareAsync(uri, {
+        mimeType: isVideo ? 'video/mp4' : 'image/jpeg',
         dialogTitle: 'Share to WhatsApp',
-        UTI: selectedMedia?.type === 'video' ? 'public.mpeg-4' : 'public.jpeg'
+        UTI: isVideo ? 'public.mpeg-4' : 'public.jpeg'
       });
+      return true;
     } catch (e: any) {
       Toast.show('Share failed: ' + (e?.message ?? String(e)));
+      return false;
     }
   };
 
-  const handleSaveToGallery = async (uris: string[]) => {
+  const handleSaveToGallery = async (uris: string[]): Promise<boolean> => {
     try {
       const { status } = await MediaLibrary.requestPermissionsAsync();
       if (status !== 'granted') {
         Toast.show('Camera Roll permission is required. Please allow it in Settings.');
-        return;
+        return false;
       }
       
       for (const uri of uris) {
         await MediaLibrary.saveToLibraryAsync(uri);
       }
       // No toast here anymore, the button itself changes state!
+      return true;
     } catch (e: any) {
       Toast.show('Save failed: ' + (e?.message ?? String(e)));
+      return false;
     }
   };
 
@@ -389,9 +461,13 @@ function App() {
         {isProcessing ? (
           <View style={styles.cleanCard}>
             <TransferAnimation />
-            <Text style={styles.processingTitle}>Compressing Video...</Text>
+            <Text style={styles.processingTitle}>
+              {selectedMedia?.type === 'photo' ? 'Optimizing Photo...' : 'Optimizing Video...'}
+            </Text>
             <Text style={styles.processingSubtitle}>
-              Please wait while we optimize your video for WhatsApp Status.
+              {selectedMedia?.type === 'photo'
+                ? 'Please wait while we prepare your photo in HD for WhatsApp Status.'
+                : 'Please wait while we prepare your video in HD for WhatsApp Status. Longer videos take a bit more time.'}
             </Text>
           </View>
         ) : null}
@@ -502,11 +578,75 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
   },
+  partsScroll: {
+    maxHeight: 280,
+    marginBottom: 12,
+  },
+  partRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 22,
+  },
+  partRowNext: {
+    backgroundColor: '#FFF',
+    borderColor: '#FFF',
+  },
+  partRowShared: {
+    backgroundColor: 'rgba(37, 211, 102, 0.08)',
+    borderColor: 'rgba(37, 211, 102, 0.3)',
+  },
+  partNumber: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(37, 211, 102, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 14,
+  },
+  partNumberText: {
+    color: '#FFF',
+    fontWeight: '800',
+    fontSize: 15,
+  },
+  partLabel: {
+    flex: 1,
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  partAction: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 14,
+    fontWeight: '700',
+    marginRight: 8,
+  },
+  tipBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 8,
+  },
+  tipText: {
+    flex: 1,
+    color: '#888',
+    fontSize: 13,
+    lineHeight: 18,
+  },
 });
 
 const WrappedApp = () => (
   <ErrorBoundary>
-    <App />
+    <View style={{ flex: 1 }}>
+      <App />
+      {/* Must be mounted for Toast.show() messages to appear on any screen */}
+      <ToastProvider />
+    </View>
   </ErrorBoundary>
 );
 

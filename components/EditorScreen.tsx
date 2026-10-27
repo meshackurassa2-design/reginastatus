@@ -606,14 +606,21 @@ export default function EditorScreen({ videoUri, onDiscard, onSave }: EditorScre
               <Text style={[styles.actionText, { color: '#FF3B30', fontSize: 11 * scale }]}>Discard</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.actionButton} onPress={() => onSave({
-              trimStartMillis: trimStart,
-              trimEndMillis: trimEnd,
-              watermarkText: watermarkName ? `ReginaStatus • ${watermarkName}` : 'ReginaStatus',
-              musicUri: selectedAudio ? null /* Add real audio picking logic if needed */ : null,
-              videoVolume,
-              musicVolume
-            })}>
+            <TouchableOpacity style={styles.actionButton} onPress={() => {
+              // Stop preview playback so it doesn't keep playing behind the export screen
+              videoRef.current?.pauseAsync();
+              musicSoundRef.current?.pauseAsync();
+              onSave({
+                trimStartMillis: trimStart,
+                // Fall back to the full duration if the end handle was never set
+                trimEndMillis: trimEnd > trimStart ? trimEnd : durationRef.current,
+                watermarkText: watermarkName ? `ReginaStatus • ${watermarkName}` : 'ReginaStatus',
+                // Previously hard-coded to null, so picked music was never added to the export
+                musicUri: selectedAudio ? musicUri : null,
+                videoVolume,
+                musicVolume
+              });
+            }}>
               <View style={[styles.actionIconCircle, { backgroundColor: '#32CD32' }]}>
                 <Ionicons name="checkmark" size={20 * scale} color="#FFF" />
               </View>

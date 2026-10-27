@@ -14,7 +14,8 @@
         "NSPhotoLibraryAddUsageDescription": "ReginaStatus needs permission to save your processed videos to the Camera Roll.",
         "NSMicrophoneUsageDescription": "ReginaStatus needs microphone access for audio processing.",
         "NSCameraUsageDescription": "ReginaStatus needs camera access to record videos.",
-        "NSUserTrackingUsageDescription": "We use tracking to improve your experience with personalized content."
+        "NSUserTrackingUsageDescription": "We use tracking to improve your experience with personalized content.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
